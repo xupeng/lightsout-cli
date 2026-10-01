@@ -47,15 +47,31 @@ func displays() throws -> [Display] {
     return known.sorted { $0.id < $1.id }
 }
 
-func resolve(_ display: Display) throws -> UInt32 {
-    guard let identifier = CFUUIDCreateFromString(nil, display.uuid as CFString) else {
+func displayIDForUUID(_ identifier: CFUUID) -> UInt32 {
+    CGDisplayGetDisplayIDFromUUID(identifier)
+}
+
+func resolve(_ display: Display, allowSavedID: Bool = false,
+             lookupID: (CFUUID) -> UInt32 = displayIDForUUID,
+             lookupUUID: (UInt32) -> String? = uuid) throws -> UInt32 {
+    guard UUID(uuidString: display.uuid) != nil,
+          let identifier = CFUUIDCreateFromString(nil, display.uuid as CFString) else {
         throw CLIError("Invalid saved display UUID")
     }
-    let id = CGDisplayGetDisplayIDFromUUID(identifier)
-    guard id != kCGNullDirectDisplay, uuid(id) == display.uuid else {
-        throw CLIError("Display is unavailable; reconnect its cable and run list")
+    let id = lookupID(identifier)
+    if id != kCGNullDirectDisplay, lookupUUID(id) == display.uuid {
+        return id
     }
-    return id
+    // Disabled displays can disappear from both public UUID lookup APIs.
+    // SkyLight can still reconnect them using their saved session display ID.
+    if allowSavedID, display.id != kCGNullDirectDisplay {
+        let currentUUID = lookupUUID(display.id)
+        if currentUUID == nil || currentUUID == display.uuid {
+            return display.id
+        }
+        throw CLIError("Saved display ID now belongs to another display; run list")
+    }
+    throw CLIError("Display is unavailable; reconnect its cable and run list")
 }
 
 func configure(_ id: UInt32, enabled: Bool) throws {
@@ -109,8 +125,8 @@ func run() throws {
     guard let display = known.first(where: { $0.id == requested }) else {
         throw CLIError("Unknown display ID; run list first")
     }
-    let id = try resolve(display)
     let enabled = args[0] == "on"
+    let id = try resolve(display, allowSavedID: enabled)
     if !enabled && active.contains(id) && active.count <= 1 {
         throw CLIError("Refusing to disable the last active display")
     }
@@ -120,7 +136,11 @@ func run() throws {
     print("Display \(requested): requested \(enabled ? "on" : "off")")
 }
 
+#if TESTING
+try ResolutionTests.main()
+#else
 do { try run() } catch {
     FileHandle.standardError.write(Data("Error: \(error)\n".utf8))
     exit(1)
 }
+#endif
