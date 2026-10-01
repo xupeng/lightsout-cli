@@ -2,6 +2,8 @@ import AppKit
 import CoreGraphics
 import Darwin
 
+let version = "0.1.2"
+
 struct CLIError: Error, CustomStringConvertible {
     let description: String
     init(_ message: String) { description = message }
@@ -102,8 +104,12 @@ func configure(_ id: UInt32, enabled: Bool) throws {
 
 func run() throws {
     let args = Array(CommandLine.arguments.dropFirst())
+    if args == ["--version"] || args == ["version"] {
+        print("lightsout \(version)")
+        return
+    }
     if args.isEmpty || args == ["--help"] || args == ["help"] {
-        print("Usage: lightsout list | off <display-id> | on <display-id>\nChanges last for the current login session. Use list to find display IDs.")
+        print("Usage: lightsout list | off <display-id> | on <display-id>\n       lightsout --version\nChanges last for the current login session. Use list to find display IDs.")
         return
     }
     guard args == ["list"] || (args.count == 2 && ["off", "on"].contains(args[0]) && UInt32(args[1]) != nil) else {

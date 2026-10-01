@@ -7,7 +7,11 @@ make
 ./lightsout list
 ./lightsout off 2
 ./lightsout on 2
+./lightsout --version
 ```
+
+`lightsout --version` (or `lightsout version`) prints the executable's version,
+which matches the release tag and stable Homebrew formula version.
 
 Replace `2` with the actual display ID reported by `list`. The CLI refuses to disable the last active display.
 
